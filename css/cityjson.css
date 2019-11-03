@@ -5,6 +5,7 @@ html{
   height: 100%;
   padding: 0px;
   overflow-y: hidden; /*important as otherwise size is somehow scrollable which is not desired */
+  font-family: 'Roboto', sans-serif; 
 }
 
 body{
@@ -86,6 +87,11 @@ tr{
   width: 200px;
 }
 
+#inputSettings{
+  height: 50px;
+  margin-right: 10px;
+  float: right;
+}
 
 #dropbox.highlight {
   background: #0F73BD;
@@ -130,7 +136,7 @@ tr{
   bottom: 0%;
   height: 32.5vh;
   width: 100%;
-  overflow: auto;
+  overflow: scroll;
 }
 
 #cityObjId{
@@ -152,4 +158,30 @@ tr{
   bottom: 10px;
   position: absolute;
   left: 26vh;
+}
+
+.liObjects{
+  cursor: default;
+  margin-bottom: 5px;
+}
+
+#attributeTable{
+  table-layout: fixed;
+  width: 100%;
+}
+
+.td_key{
+  width: 50%;
+  max-width: 50%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.td_val{
+  width: 50%;
+  max-width: 50%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }

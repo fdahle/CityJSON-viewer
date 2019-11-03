@@ -1,0 +1,66 @@
+#settingsBox{
+  position: absolute;
+  height: 600px;
+  max-width: 500px;
+  left: 50%;
+  top: 10%;
+  border: 3px solid lightgray;
+  box-shadow: 5px 5px 10px grey;
+  padding-left: 10px;
+  padding-right: 10px;
+  background: white;
+}
+
+#settingsCaption{
+  height: 70px;
+}
+
+#settingsCaptionText{
+  line-height: 70px;
+  margin: 0px;
+  font-weight: bold;
+  font-size: 25px;
+  float: left;
+}
+
+#closeSettings{
+  float: right
+}
+
+#settings_Color{
+  height: 530px;
+  width: 100%;
+  overflow-y: auto;
+}
+
+.inputColorPicker{
+  float: right;
+}
+
+.labelColor{
+  margin-right: 15px;
+}
+
+input[type="color"]{
+  border: 1px solid darkgray;
+  -webkit-appearance: none;
+}
+input[type="color"]::-webkit-color-swatch-wrapper {
+	padding: 0;
+}
+input[type="color"]::-webkit-color-swatch {
+	border: none;
+}
+
+#log{
+  position: absolute;
+  width: 30%;
+  max-width: 500px;
+  height: 250px;
+  left: calc(25vh + 5px);
+  bottom: 0px;
+  background: white;
+  opacity: 0.2;
+  font-family: "Courier New";
+  overflow-y: auto;
+}
