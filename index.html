@@ -4,16 +4,18 @@
 <head>
 	<meta charset=utf-8>
 	<title>CityJSON viewer</title>
-	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/earcut@2.1.5/dist/earcut.dev.min.js"></script>
+	<script src="js/earcut.js"></script>
+	<script src="js/jquery-3.3.1.min.js"></script>
 	<script src="js/three.min.js"></script>
 	<script src="js/OrbitControls.js"></script>
 	<script src="js/viewer.js"></script>
 	<script src="js/functions.js"></script>
 
-	<link href='http://fonts.googleapis.com/css?family=Roboto' rel='stylesheet' type='text/css'>
+	<link rel="icon" type="image/x-icon" href="favicon.ico">
+	<link href="https://fonts.googleapis.com/css?family=Roboto&display=swap" rel="stylesheet">
 	<link rel="stylesheet" href="css/cityjson.css">
 	<link rel="stylesheet" href="css/controls.css">
+	<link rel="stylesheet" href="css/settings.css">
 </head>
 
 <body>
@@ -30,7 +32,13 @@
           <input type="checkbox" id="wireframeBox" onclick="toggleWireframe()">
 				  <span class="slider round"></span>
 				  <p class="dbText">show edges</p>
-				</label>
+			</label>
+			<label class="switch">
+          <input type="checkbox" id="normalsBox" onclick="toggleNormals()">
+				  <span class="slider round"></span>
+				  <p class="dbText">show normals</p>
+			</label>
+			<input type="image" id="inputSettings" src="img/settings.png" onclick="toggleSettings(true)" />
 		</div>
 		<div id="filesBox" hidden="hidden">
 			<ul id="TreeView">
@@ -48,13 +56,19 @@
 	<div id="dragger"></div>
 	<div class="loader" id="loader" hidden="hidden"></div>
 	<div id="infoBox">
-		<a href="https://3d.bk.tudelft.nl/" target="_blank">
-			<img id="imgTuD" src="/img/tud_3geo.png">
-		</a>
 		<p><a href="https://github.com/tudelft3d/CityJSON-viewer/" target="_blank">GitHub repository</a></p>
 	</div>
+	<div id="settingsBox" hidden="hidden">
+		<div id="settingsCaption">
+			<p id="settingsCaptionText">Settings</p>
+			<input type="image" id="closeSettings" onclick="toggleSettings(false)" src="img/close.png" />
+		</div>
+		<div id="settings_Color">
+		</div>
+	</div>
+	<div id="log" onmouseover='showLog()' onmouseout="hideLog()"></div>
 	<div id="viewer"></div>
-	<div id="axisHelper"></div>
+	<!--<div id="axisHelper"></div>-->
 	<script>
 		$(document).ready(function() {
 			initDocument();
