@@ -6,11 +6,13 @@ A simple web-viewer for [CityJSON](https://www.cityjson.org) files: drag-and-dro
 
   - get attribute information of city objects
   - load multiple files at the same time
+  - supporting of the world position of the files
   - supporting of parent/children
   - hide/show complete file or single objects
   - shadow support for presentation
   - smoother controls
   - cleaned up code
+  - choosing the colours
 
 You can access it online at [https://tudelft3d.github.io/CityJSON-viewer/](https://tudelft3d.github.io/CityJSON-viewer/). This program will regulary be updated.
 
@@ -18,8 +20,6 @@ You can access it online at [https://tudelft3d.github.io/CityJSON-viewer/](https
 
   - geometry templates (nothing will be drawn)
   - textures and material
-  - support world position of the files
-  - choosing the colours, these are hard-coded for the CityJSON classes
   - offline support
   - enable editing and downloading of the files
 
