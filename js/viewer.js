@@ -5,23 +5,26 @@ var jsonDict = {} //contains the json datas
 var boolJSONload = false //checks if jsondata is loaded
 var meshes = [] //contains the meshes of the objects
 var geoms = {} //contains the geometries of the objects
-//create empty array that contains all the meshes
+var clickedObj = [] //create empty array that contains all the meshes
 
 //Camera variables
-var scene
-var camera
-var renderer
-var raycaster
-var mouse
-var controls
-var spot_light
+var scene;
+var camera;
+var renderer;
+var raycaster;
+var mouse;
+var controls;
+var spot_light;
+var normals = [];
 
 // called at document loading and creates the button functions
 function initDocument() {
 
+  console.log("TODO: Currently with doublesided meshes - only temporary bugfix")
+
   $("#viewer").mousedown(function(eventData) {
     if (eventData.button == 0) { //leftClick
-      getAttributes(eventData)
+      getClicked(eventData)
     }
   });
 
@@ -54,6 +57,12 @@ function initDocument() {
 
   });
 
+  //create the colorlist
+  storeColors()
+  buildColors()
+
+  //enable the offline support
+  //initOffline();
 
   // Dropbox functions
   var dropbox;
@@ -100,6 +109,7 @@ function initDocument() {
   function click(e) {
     $('input:file')[0].click()
   }
+
 }
 
 //called at document load and create the viewer functions
@@ -108,8 +118,8 @@ function initViewer() {
   camera = new THREE.PerspectiveCamera(
     60, // Field of view
     window.innerWidth / window.innerHeight, // Aspect ratio
-    0.001, // Near clipping pane
-    10000 // Far clipping pane
+    1, // Near clipping pane  // if its smaller (for example 0.0001) the object start flickering when moving
+    1000000 // Far clipping pane
   );
 
   //renderer for three.js
@@ -126,22 +136,21 @@ function initViewer() {
   raycaster = new THREE.Raycaster()
   mouse = new THREE.Vector2();
 
+
   //add AmbientLight (light that is only there that there's a minimum of light and you can see color)
   //kind of the natural daylight
   var am_light = new THREE.AmbientLight(0xFFFFFF, 0.7); // soft white light
   scene.add(am_light);
 
   // Add directional light
-  var spot_light = new THREE.SpotLight(0xDDDDDD);
-  spot_light.position.set(84616, -1, 447422);
-  spot_light.target = scene;
+  spot_light = new THREE.SpotLight(0xDDDDDD);
   spot_light.castShadow = true;
   spot_light.intensity = 0.4
-  spot_light.position.normalize()
+  //spot_light.position.normalize()
   scene.add(spot_light);
 
-  //Helpers
   /*
+  //Helpers
   var spotLightHelper = new THREE.SpotLightHelper( spot_light );
   scene.add( spotLightHelper );
 
@@ -163,12 +172,89 @@ function initViewer() {
 
 }
 
+//init the offlinesupport
+function initOffline() {
+
+  //register serviceWorker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(function(registration) {
+        console.log('Registered:', registration);
+      })
+      .catch(function(error) {
+        console.log('Registration failed: ', error);
+      });
+  }
+
+  //save the data in the Cache
+  var CACHE_NAME = 'offline-cache';
+  var urlsToCache = [
+    '.',
+    'index.html',
+    'js/earcut.js',
+    'js/functions.js',
+    'js/jquery-3.3.1.min.js',
+    'js/OrbitControls.js',
+    'js/three.min.js',
+    'js/viewer.js',
+    'css/cityjson.css',
+    'css/controls.css',
+    'css/settings.css',
+    'img/close.png',
+    'img/settings.png'
+  ];
+  self.addEventListener('install', function(event) {
+    event.waitUntil(
+      caches.open(CACHE_NAME)
+      .then(function(cache) {
+        return cache.addAll(urlsToCache);
+      })
+    );
+  });
+
+
+  //fetch the data
+  self.addEventListener('fetch', function(event) {
+    event.respondWith(
+      caches.match(event.request)
+      .then(function(response) {
+        return response || fetchAndCache(event.request);
+      })
+    );
+  });
+
+  function fetchAndCache(url) {
+    return fetch(url)
+      .then(function(response) {
+        // Check if we received a valid response
+        if (!response.ok) {
+          throw Error(response.statusText);
+        }
+        return caches.open(CACHE_NAME)
+          .then(function(cache) {
+            cache.put(url, response.clone());
+            return response;
+          });
+      })
+      .catch(function(error) {
+        console.log('Request failed:', error);
+        // You could return a custom offline 404 page here
+      });
+  }
+
+}
+
 //executed when files are uploaded
 async function handleFiles(files) {
 
   // uncheck wireframe checkbox
   document.getElementById("wireframeBox").checked = false;
   toggleWireframe()
+
+  // uncheck wireframe checkbox
+  document.getElementById("normalsBox").checked = false;
+  toggleNormals()
+
 
   boolJSONload = false;
 
@@ -197,9 +283,10 @@ async function handleFiles(files) {
     var objectURL = window.URL.createObjectURL(files[i])
     var json = await loadJSON(objectURL)
     var jsonName = files[i].name.split(".")[0]
+    addtoLog("start loading file '" + jsonName + "'");
 
     //json file has an error and cannot be loaded
-    if (json == -1){
+    if (json == -1) {
       window.alert("File " + jsonName + ".json has an error and cannot be loaded!")
       continue
     }
@@ -215,15 +302,23 @@ async function handleFiles(files) {
       '<span class="spanLiFileName">' + jsonName + '</span>' +
       '<ul class="fileTree" id="ul_' + jsonName + '"></ul>' +
       '</li>')
-
     //load the cityObjects into the viewer
     await loadCityObjects(jsonName)
 
     //already render loaded objects
     renderer.render(scene, camera);
-    console.log("JSON file '" + jsonName + "' loaded")
+
+    //count number of objects
+    var totalco = Object.keys(json.CityObjects).length;
+
+    addtoLog("file '" + jsonName + "' loaded with " + totalco + " objects");
+
+
+    //display attributeBox
+    $("#attributeBox").show();
 
   }
+
 
   //hide loader when loadin is finished
   $("#loader").hide();
@@ -248,7 +343,7 @@ async function loadJSON(url) {
       _data = data
     });
   } catch (e) {
-    return(-1)
+    return (-1)
   }
 
   return (_data);
@@ -259,68 +354,29 @@ async function loadCityObjects(jsonName) {
 
   var json = jsonDict[jsonName]
 
-  console.log("TODO: REMOVE NORMGEOM");
-  //create one geometry that contains all vertices (in normalized form)
-  //normalize must be done for all coordinates as otherwise the objects are at same pos and have the same size
-  var normGeom = new THREE.Geometry()
-  for (var i = 0; i < json.vertices.length; i++) {
-    var point = new THREE.Vector3(
-      json.vertices[i][0],
-      json.vertices[i][1],
-      json.vertices[i][2]
-    );
-    normGeom.vertices.push(point)
-  }
-  normGeom.normalize()
-
-  for (var i = 0; i < json.vertices.length; i++) {
-    json.vertices[i][0] = normGeom.vertices[i].x;
-    json.vertices[i][1] = normGeom.vertices[i].y;
-    json.vertices[i][2] = normGeom.vertices[i].z;
-  }
-
-  var stats = getStats(json.vertices)
-  var minX = stats[0]
-  var minY = stats[1]
-  var minZ = stats[2]
-  var avgX = stats[3]
-  var avgY = stats[4]
-  var avgZ = stats[5]
-
-  camera.position.set(0, 0, 2);
-  camera.lookAt(avgX, avgY, avgZ);
-
-  controls.target.set(avgX,
-    avgY,
-    avgZ);
-
-  //enable movement parallel to ground
-  controls.screenSpacePanning = true;
-
-
-  //count number of objects
-  var totalco = Object.keys(json.CityObjects).length;
-  console.log("Total # City Objects: ", totalco);
-
   //create dictionary
   var children = {}
+
+  var stats = getStats(json);
+  var divisor = stats[9];
 
   //iterate through all cityObjects
   for (var cityObj in json.CityObjects) {
 
-    try {
-      //parse cityObj that it can be displayed in three js
-      var returnChildren = await parseObject(cityObj, jsonName)
+    //try {
+    //parse cityObj that it can be displayed in three js
+    var returnChildren = await parseObject(cityObj, jsonName, divisor)
 
-      //if object has children add them to the childrendict
-      for (var i in returnChildren) {
-        children[jsonName + '_' + returnChildren[i]] = cityObj
-      }
-
-    } catch (e) {
-      console.log("ERROR at creating: " + cityObj);
-      continue
+    //if object has children add them to the childrendict
+    for (var i in returnChildren) {
+      children[jsonName + '_' + returnChildren[i]] = cityObj
     }
+
+    //log if an object has an eroor and continue
+    //} catch (e) {
+    //  console.log("ERROR at creating: " + cityObj);
+    //  continue;
+    //}
 
 
     var appendix = $('#ul_' + jsonName)
@@ -329,7 +385,7 @@ async function loadCityObjects(jsonName) {
       delete children[jsonName + '_' + cityObj]
     }
 
-    appendix.append('<li><input type="checkbox" onclick="toggleMesh(this);" id="check_' + cityObj + '" checked>' + cityObj + '</li>');
+    appendix.append('<li class="liObjects" onclick="selectObjByList(this);" jsonName="' + jsonName + '" cityObj="' + cityObj + '"><input type="checkbox" onclick="toggleMesh(this);" id="check_' + cityObj + '" checked>' + cityObj + '</li>');
 
     //if object has children
     if (returnChildren != "") {
@@ -342,23 +398,65 @@ async function loadCityObjects(jsonName) {
     //set color of object
     var coType = json.CityObjects[cityObj].type;
     var material = new THREE.MeshLambertMaterial();
-    material.color.setHex(ALLCOLOURS[coType]);
+    material.side = THREE.DoubleSide;
+    //check if color is predefined
+    if (localStorage.getItem("color_" + coType) === null) {
+      hex = '0x' + Math.floor(Math.random() * 16777215).toString(16);
+      localStorage.setItem("color_" + coType, hex);
+    } else {
+      hex = localStorage.getItem("color_" + coType)
+    }
+    material.color.setHex(hex);
 
     //create mesh
     //geoms[cityObj].normalize()
     var _id = jsonName + "_" + cityObj
     var coMesh = new THREE.Mesh(geoms[_id], material)
     coMesh.name = cityObj;
-    coMesh.jsonName = jsonName
+    coMesh.jsonName = jsonName;
+    coMesh.coType = coType
     coMesh.castShadow = true;
     coMesh.receiveShadow = true;
     scene.add(coMesh);
     meshes.push(coMesh);
   }
+
+  var minX = stats[0];
+  var minY = stats[1];
+  var minZ = stats[2];
+  var avgX = stats[3];
+  var avgY = stats[4];
+  var avgZ = stats[5];
+  var maxX = stats[6];
+  var maxY = stats[7];
+  var maxZ = stats[8];
+
+  spot_light.position.set(minX, minY, maxZ + 1000);
+  spot_light.target.position.set(avgX, avgY, 0);
+  scene.add(spot_light.target);
+
+  width = ((maxX - minX) + (maxY - minY)) / 2
+
+  if (width < 5) {
+    width = 5;
+  }
+
+  camera.position.set(avgX, avgY, width * 1.2);
+  camera.lookAt(avgX, avgY, avgZ)
+
+
+  //camera.rotation.set(1.0250179306032716, 0.011690303649862465, -0.01924645011326)
+
+  controls.target.set(avgX, avgY, 0);
+  controls.update()
+
+  //enable movement parallel to ground
+  controls.screenSpacePanning = true;
+
 }
 
 //convert json file to viwer-object
-async function parseObject(cityObj, jsonName) {
+async function parseObject(cityObj, jsonName, divisor) {
 
   var json = jsonDict[jsonName]
 
@@ -404,11 +502,19 @@ async function parseObject(cityObj, jsonName) {
       } else {
 
         //add vertice to geometry
-        var point = new THREE.Vector3(
-          json.vertices[index][0],
-          json.vertices[index][1],
-          json.vertices[index][2]
-        );
+        if (divisor == false) {
+          var point = new THREE.Vector3(
+            json.vertices[index][0],
+            json.vertices[index][1],
+            json.vertices[index][2]
+          );
+        } else {
+          var point = new THREE.Vector3(
+            json.vertices[index][0],
+            json.vertices[index][1],
+            json.vertices[index][2] / 1000
+          );
+        }
         geom.vertices.push(point)
 
         vertices.push(index)
@@ -420,32 +526,38 @@ async function parseObject(cityObj, jsonName) {
 
     }
 
-    /*
-    console.log("Vert", vertices);
-    console.log("Indi", indices);
-    console.log("bound", boundary);
-    console.log("geom", geom.vertices);
-    */
 
     //create face
     //triangulated faces
+
     if (boundary.length == 3) {
-      geom.faces.push(
-        new THREE.Face3(boundary[0], boundary[1], boundary[2])
-      )
+
+      var face = new THREE.Face3(boundary[0], boundary[1], boundary[2])
+      geom.faces.push(face)
 
       //non triangulated faces
     } else if (boundary.length > 3) {
 
       //create list of points
       var pList = []
-      for (var j = 0; j < boundary.length; j++) {
-        pList.push({
-          x: json.vertices[vertices[boundary[j]]][0],
-          y: json.vertices[vertices[boundary[j]]][1],
-          z: json.vertices[vertices[boundary[j]]][2]
-        })
+      if (divisor = false) {
+        for (var j = 0; j < boundary.length; j++) {
+          pList.push({
+            x: json.vertices[vertices[boundary[j]]][0],
+            y: json.vertices[vertices[boundary[j]]][1],
+            z: json.vertices[vertices[boundary[j]]][2]
+          })
+        }
+      } else {
+        for (var j = 0; j < boundary.length; j++) {
+          pList.push({
+            x: json.vertices[vertices[boundary[j]]][0],
+            y: json.vertices[vertices[boundary[j]]][1],
+            z: json.vertices[vertices[boundary[j]]][2] / 1000
+          })
+        }
       }
+
       //get normal of these points
       var normal = await get_normal_newell(pList)
 
@@ -462,13 +574,8 @@ async function parseObject(cityObj, jsonName) {
 
       //create faces based on triangulation
       for (var j = 0; j < tr.length; j += 3) {
-        geom.faces.push(
-          new THREE.Face3(
-            boundary[tr[j]],
-            boundary[tr[j + 1]],
-            boundary[tr[j + 2]]
-          )
-        )
+        var face = new THREE.Face3(boundary[tr[j]], boundary[tr[j + 1]], boundary[tr[j + 2]])
+        geom.faces.push(face)
       }
 
     }
@@ -502,24 +609,22 @@ function buildInfoDiv(jsonName, cityObj) {
   $("#cityObjId").text(cityObj);
   //fill table with id
   $('#attributeTable').append("<tr>" +
-    "<td>id</td>" +
-    "<td>" + cityObj + "</td>" +
+    "<td class='td_key'>id</td>" +
+    "<td class='td_val'>" + cityObj + "</td>" +
     "</tr>")
 
   //fill table with attributes
   for (var key in json.CityObjects[cityObj].attributes) {
     $('#attributeTable').append("<tr>" +
-      "<td>" + key + "</td>" +
-      "<td>" + json.CityObjects[cityObj].attributes[key] + "</td>" +
+      "<td class='td_key'>" + key + "</td>" +
+      "<td class='td_val'>" + json.CityObjects[cityObj].attributes[key] + "</td>" +
       "</tr>")
   }
 
-  //display attributeBox
-  $("#attributeBox").show();
 }
 
 //action if mouseclick (for getting attributes ofobjects)
-function getAttributes(e) {
+function getClicked(e) {
 
   //if no cityjson is loaded return
   if (boolJSONload == false) {
@@ -546,11 +651,26 @@ function getAttributes(e) {
     return
   }
 
+  //empty the previous clicked object
+  if (clickedObj.length > 0) {
+    oldObj = clickedObj.pop();
+    var currentMesh = scene.getObjectByName(oldObj[1]);
+    currentMesh.material.emissive.setHex(oldObj[2]);
+
+  }
+
+  //highlight the obj
+  var oldHex = intersects[0].object.material.emissive.getHex();
+  intersects[0].object.material.emissive.setHex(0xff0000);
+  renderer.render(scene, camera);
+
   //get the id of the first object that intersects (equals the clicked object)
   var jsonName = intersects[0].object.jsonName;
   var cityObjId = intersects[0].object.name;
-  buildInfoDiv(jsonName, cityObjId);
 
+  clickedObj.push([jsonName, cityObjId, oldHex])
+
+  buildInfoDiv(jsonName, cityObjId);
 }
 
 //display or hide the wireframe
@@ -589,6 +709,37 @@ function toggleWireframe() {
 
   // end spinner
   $("#loader").hide();
+}
+
+//display or hide the normals
+function toggleNormals() {
+  if (boolJSONload == false) {
+    return
+  }
+
+  // start spinner
+  $("#loader").show();
+
+
+  var checkBox = document.getElementById("normalsBox");
+  if (checkBox.checked == true) {
+    for (var i = 0; i < meshes.length; i++) {
+
+      helper = new THREE.FaceNormalsHelper(meshes[i], 2, 0x00ff00, 1);
+      scene.add(helper)
+      normals.push(helper)
+    }
+  } else {
+    for (var i = 0; i < meshes.length; i++) {
+      scene.remove(normals.pop());
+    }
+  }
+
+  renderer.render(scene, camera);
+
+  // end spinner
+  $("#loader").hide();
+
 }
 
 //display or hide one single cityObject
@@ -731,5 +882,30 @@ function addAxisHelper() {
   scene2.add(axes2);
 
   renderer2.render(scene2, camera2)
+
+}
+
+function selectObjByList(input) {
+  jsonName = input.getAttribute("jsonname");
+  cityObjId = input.getAttribute("cityobj");
+  buildInfoDiv(jsonName, cityObjId)
+
+  //empty the previous clicked object
+  if (clickedObj.length > 0) {
+    oldObj = clickedObj.pop();
+    var currentMesh = scene.getObjectByName(oldObj[1]);
+    currentMesh.material.emissive.setHex(oldObj[2]);
+
+  }
+
+  var object = scene.getObjectByName(cityObjId);
+
+  //highlight the obj
+  var oldHex = object.material.emissive.getHex();
+  object.material.emissive.setHex(0xff0000);
+  renderer.render(scene, camera);
+
+  clickedObj.push([jsonName, cityObjId, oldHex])
+
 
 }

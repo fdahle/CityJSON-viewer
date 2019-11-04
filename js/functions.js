@@ -26,6 +26,49 @@ var ALLCOLOURS = {
   "WaterBody": 0x4da6ff
 };
 
+function storeColors() {
+  for (var key in ALLCOLOURS) {
+    if (localStorage.getItem("color_" + key) === null) {
+      var elem = ALLCOLOURS[key].toString(16)
+      if (elem == 0) {
+        elem = "000000"
+      }
+      localStorage.setItem("color_" + key, "0x" + elem);
+    }
+  }
+}
+
+function buildColors() {
+  for (var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    if (key.substring(0, 6) == "color_") {
+      var item = localStorage.getItem(key);
+      var name = key.substring(6);
+      var elem = Number(item).toString(16)
+      if (elem == 0) {
+        elem = "000000"
+      }
+      $('#settings_Color').append('<label class="labelColor" for="' + key + '">' + name + ' :</label>');
+      $('#settings_Color').append('<input class="inputColorPicker" id="' + key + '" type="color" onchange="changeColor(this);" value="#' + elem + '"/>');
+      $('#settings_Color').append('<br><br>')
+    };
+  }
+}
+
+function changeColor(input) {
+  var val = "0x" + input.value.substring(1);
+  var coType = input.id.substring(6);
+  localStorage.setItem(input.id, val);
+
+  for (var i in meshes) {
+    if (meshes[i].coType == coType) {
+      meshes[i].material.color.setHex(val);
+    };
+  }
+
+  renderer.render(scene, camera);
+}
+
 //not used can be deleted prob
 function sortVert(pList, type) {
 
@@ -90,88 +133,212 @@ function sortVert(pList, type) {
   }
   pList = []
 
-  for (i = 0; i < points.length; i++){
+  for (i = 0; i < points.length; i++) {
     pList.push(points[i].x)
     pList.push(points[i].y)
     pList.push(points[i].z)
   }
 
-  return(pList)
+  return (pList)
 
 }
 
 //-- calculate normal of a set of points
 function get_normal_newell(indices) {
 
-	// find normal with Newell's method
-	var n = [0.0, 0.0, 0.0];
+  // find normal with Newell's method
+  var n = [0.0, 0.0, 0.0];
 
-	for (var i = 0; i < indices.length; i++) {
-	  var nex = i + 1;
-	  if ( nex == indices.length) {
-	    nex = 0;
-	  };
-	  n[0] = n[0] + ( (indices[i].y - indices[nex].y) * (indices[i].z + indices[nex].z) );
-	  n[1] = n[1] + ( (indices[i].z - indices[nex].z) * (indices[i].x + indices[nex].x) );
-	  n[2] = n[2] + ( (indices[i].x - indices[nex].x) * (indices[i].y + indices[nex].y) );
-		};
-	var b = new THREE.Vector3(n[0], n[1], n[2]);
-  return(b.normalize())
+  for (var i = 0; i < indices.length; i++) {
+    var nex = i + 1;
+    if (nex == indices.length) {
+      nex = 0;
+    };
+    n[0] = n[0] + ((indices[i].y - indices[nex].y) * (indices[i].z + indices[nex].z));
+    n[1] = n[1] + ((indices[i].z - indices[nex].z) * (indices[i].x + indices[nex].x));
+    n[2] = n[2] + ((indices[i].x - indices[nex].x) * (indices[i].y + indices[nex].y));
+  };
+  var b = new THREE.Vector3(n[0], n[1], n[2]);
+  return (b.normalize())
 };
 
 function to_2d(p, n) {
   p = new THREE.Vector3(p.x, p.y, p.z)
-	var x3 = new THREE.Vector3(1.1, 1.1, 1.1);
-	if ( x3.distanceTo(n) < 0.01 ) {
-		x3.add(new THREE.Vector3(1.0, 2.0, 3.0));
-	}
-	var tmp = x3.dot(n);
-	var tmp2 = n.clone();
-	tmp2.multiplyScalar(tmp);
-	x3.sub(tmp2);
-	x3.normalize();
-	var y3 = n.clone();
-	y3.cross(x3);
-	let x = p.dot(x3);
-	let y = p.dot(y3);
-	var re = {x: x, y: y};
-	return re;
+  var x3 = new THREE.Vector3(1.1, 1.1, 1.1);
+  if (x3.distanceTo(n) < 0.01) {
+    x3.add(new THREE.Vector3(1.0, 2.0, 3.0));
+  }
+  var tmp = x3.dot(n);
+  var tmp2 = n.clone();
+  tmp2.multiplyScalar(tmp);
+  x3.sub(tmp2);
+  x3.normalize();
+  var y3 = n.clone();
+  y3.cross(x3);
+  let x = p.dot(x3);
+  let y = p.dot(y3);
+  var re = {
+    x: x,
+    y: y
+  };
+  return re;
 }
 
-function getStats(vertices){
+function getStats(json) {
+
+  vertices = json.vertices
 
   var minX = Number.MAX_VALUE;
   var minY = Number.MAX_VALUE;
   var minZ = Number.MAX_VALUE;
+
+  var maxX = Number.MIN_VALUE;
+  var maxY = Number.MIN_VALUE;
+  var maxZ = Number.MIN_VALUE;
 
   var sumX = 0;
   var sumY = 0;
   var sumZ = 0
   var counter = 0
 
-  for (var i in vertices){
-    sumX = sumX + vertices[i][0]
-    if (vertices[i][0] < minX){
+  for (var i in vertices) {
+    if (vertices[i][0] < minX) {
       minX = vertices[i][0]
     }
+    if (vertices[i][0] > maxX) {
+      maxX = vertices[i][0]
+    }
 
-    sumY = sumY + vertices[i][1]
-    if (vertices[i][1] < minY){
+    if (vertices[i][1] < minY) {
       minY = vertices[i][1]
     }
-
-    if (vertices[i][2] < minZ){
-      minZ = vertices[i][2]
+    if (vertices[i][1] > maxY) {
+      maxY = vertices[i][1]
     }
 
-    sumZ = sumZ + vertices[i][2]
+    if (vertices[i][2] < minZ) {
+      minZ = vertices[i][2]
+    }
+    if (vertices[i][2] > maxZ) {
+      maxZ = vertices[i][2]
+    }
     counter = counter + 1
   }
 
-  var avgX = sumX/counter
-  var avgY = sumY/counter
-  var avgZ = sumZ/counter
+  var avgX = maxX - (maxX - minX) / 2;
+  var avgY = maxY - (maxY - minY) / 2;
+  var avgZ = maxZ - (maxZ - minZ) / 2;
 
-  return ([minX, minY, minZ, avgX, avgY, avgZ])
+  //get stats from geographicalExtent (if availabe)
+  if (json.metadata != undefined && json.metadata.geographicalExtent != undefined) {
 
+    var gEx = json.metadata.geographicalExtent;
+
+    var minXge = gEx[0];
+    var minYge = gEx[1];
+    var minZge = gEx[2];
+
+    var maxXge = gEx[3];
+    var maxYge = gEx[4];
+    var maxZge = gEx[5];
+
+    var avgXge = maxXge + minXge / 2;
+    var avgYge = maxYge + minYge / 2;
+    var avgZge = maxZge + minZge / 2;
+
+    var same = true;
+
+    if (minXge != minX) {
+      same = false
+    };
+    if (minYge != minY) {
+      same = false
+    };
+    if (minZge != minZ) {
+      same = false
+    };
+
+    if (maxXge != maxX) {
+      same = false
+    };
+    if (maxYge != maxY) {
+      same = false
+    };
+    if (maxZge != maxZ) {
+      same = false
+    };
+
+    if (avgXge != avgX) {
+      same = false
+    };
+    if (avgYge != avgY) {
+      same = false
+    };
+    if (avgZge != avgZ) {
+      same = false
+    };
+
+    if (same == false) {
+      addtoLog("Warning: geographicalExtent is different from the real values!");
+    }
+  }
+
+  divisor = false
+  if (maxZ > 1000) {
+    addtoLog("Warning: unusual high Z-values detected (max height " + maxZ + "m)! Z-values divided by the factor of 1000");
+    maxZ = maxZ / 1000;
+    minZ = minZ / 1000;
+    avgZ = avgZ / 1000;
+    divisor = true;
+  }
+
+
+
+  return ([minX, minY, minZ, avgX, avgY, avgZ, maxX, maxY, maxZ, divisor])
+
+}
+
+//returns true if ccw, false if cw
+function checkRotation(pList) {
+  console.log(pList);
+
+  var sum = 0
+  for (var i = 0; i < pList.length; i++) {
+    var x1 = pList[i].x;
+    var y1 = pList[i].y;
+
+    var j = i + 1
+    if (j = pList.length - 1) {
+      j = 0
+    }
+    var x2 = pList[j].x;
+    var y2 = pList[j].y;
+
+    sum = sum + (x2 - x1) * (y2 + y1);
+
+  }
+
+  console.log(sum);
+}
+
+function toggleSettings(state) {
+
+  if (state == false) {
+    $("#settingsBox").hide();
+  } else {
+    $("#settingsBox").show();
+  }
+}
+
+function showLog() {
+  $("#log").css("opacity", 0.8);
+}
+
+function hideLog() {
+  $("#log").css("opacity", 0.2);
+}
+
+function addtoLog(string) {
+  $("#log").append("- " + string + "<br />");
+  $("#log").scrollTop($("#log").prop("scrollHeight"));
 }
