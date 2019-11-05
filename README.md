@@ -43,7 +43,7 @@ For getting the attribute information of an object the raycaster functionality o
 We provide a test dataset in the `data` folder.
 It is a part of the Delft in the Netherlands was automatically reconstructed with [3dfier](https://github.com/tudelft3d/3dfier).
 
-Other datasets freely available on the [CityJSON website](https://www.cityjson.org/en/0.9/datasets/).
+Other datasets freely available on the [CityJSON website](https://www.cityjson.org/datasets/).
 
 
 ## Acknowledgements
